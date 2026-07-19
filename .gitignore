@@ -1,0 +1,7 @@
+blog.md
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!.terraform.lock.hcl
