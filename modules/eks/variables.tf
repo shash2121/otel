@@ -60,9 +60,3 @@ variable "aws_region" {
   description = "AWS region"
   type        = string
 }
-
-variable "deploy_observability" {
-  description = "Deploy OTel Collector, Prometheus, Grafana, Jaeger"
-  type        = bool
-  default     = true
-}

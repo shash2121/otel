@@ -20,6 +20,5 @@ module "eks" {
   vpc_id                    = module.vpc.vpc_id
   subnet_ids                = module.vpc.public_subnet_ids
   aws_region                = var.region
-  deploy_observability      = var.deploy_observability
   tags                      = local.common_tags
 }

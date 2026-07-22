@@ -1,0 +1,108 @@
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-server
+        access: proxy
+        isDefault: true
+      - name: Jaeger
+        type: jaeger
+        url: http://jaeger:16686
+        access: proxy
+      - name: Loki
+        type: loki
+        url: http://loki:3100
+        access: proxy
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+dashboards:
+  default:
+    otel-demo:
+      json: |
+        {
+          "title": "OTel Demo - Service Overview",
+          "uid": "otel-demo",
+          "panels": [
+            {
+              "title": "Request Rate",
+              "type": "graph",
+              "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+              "targets": [
+                {
+                  "expr": "rate(http_server_request_duration_seconds_count{exported_job=\"service-a\"}[1m])",
+                  "legendFormat": "Service A",
+                  "refId": "A"
+                },
+                {
+                  "expr": "rate(http_server_request_duration_seconds_count{exported_job=\"service-b\"}[1m])",
+                  "legendFormat": "Service B",
+                  "refId": "B"
+                }
+              ],
+              "yaxes": [{ "format": "reqps" }, { "format": "short" }]
+            },
+            {
+              "title": "p99 Latency",
+              "type": "graph",
+              "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+              "targets": [
+                {
+                  "expr": "histogram_quantile(0.99, rate(http_server_request_duration_seconds_bucket{exported_job=\"service-a\"}[1m]))",
+                  "legendFormat": "Service A",
+                  "refId": "A"
+                },
+                {
+                  "expr": "histogram_quantile(0.99, rate(http_server_request_duration_seconds_bucket{exported_job=\"service-b\"}[1m]))",
+                  "legendFormat": "Service B",
+                  "refId": "B"
+                }
+              ],
+              "yaxes": [{ "format": "s", "decimals": 3 }, { "format": "short" }]
+            },
+            {
+              "title": "Error Rate",
+              "type": "graph",
+              "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+              "targets": [
+                {
+                  "expr": "sum(rate(http_server_request_duration_seconds_count{http_status_code=~\"5..\"}[1m])) / sum(rate(http_server_request_duration_seconds_count[1m])) * 100",
+                  "legendFormat": "Error %",
+                  "refId": "A"
+                }
+              ],
+              "yaxes": [{ "format": "percent", "max": 100 }, { "format": "short" }],
+              "thresholds": [
+                { "color": "green", "value": null },
+                { "color": "red", "value": 5 }
+              ]
+            },
+            {
+              "title": "Active Alerts",
+              "type": "table",
+              "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+              "targets": [
+                {
+                  "expr": "ALERTS{alertstate=\"firing\"}",
+                  "format": "table",
+                  "refId": "A"
+                }
+              ]
+            }
+          ],
+          "time": { "from": "now-15m", "to": "now" },
+          "refresh": "10s"
+        }

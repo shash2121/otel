@@ -23,8 +23,3 @@ output "node_group_arn" {
   value       = aws_eks_node_group.node_group.arn
   description = "Node group ARN"
 }
-
-output "grafana_admin_password_cmd" {
-  value       = var.deploy_observability ? "kubectl get secret grafana -o jsonpath='{.data.admin-password}' | base64 -d" : null
-  description = "Command to retrieve Grafana admin password"
-}

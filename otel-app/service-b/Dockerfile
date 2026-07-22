@@ -15,4 +15,4 @@ ENV OTEL_METRICS_EXPORTER=otlp
 ENV OTEL_LOGS_EXPORTER=otlp
 ENV OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
 
-CMD ["opentelemetry-instrument", "python", "app.py"]
+CMD ["python", "app.py"]

@@ -1,0 +1,53 @@
+extraScrapeConfigs: |
+  - job_name: 'otel-collector'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['otel-collector-opentelemetry-collector:8889']
+
+serverFiles:
+  alerting_rules.yml:
+    groups:
+      - name: otel-demo
+        rules:
+          - alert: OTelCollectorDown
+            expr: up{job="otel-collector"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "OTel Collector is not reachable"
+              description: "Prometheus cannot scrape the collector on port 8889. Check if the pod is running."
+
+          - alert: ServiceADown
+            expr: up{exported_job="service-a"} == 0
+            for: 30s
+            labels:
+              severity: critical
+            annotations:
+              summary: "Service A is down"
+
+          - alert: ServiceBDown
+            expr: up{exported_job="service-b"} == 0
+            for: 30s
+            labels:
+              severity: critical
+            annotations:
+              summary: "Service B is down"
+
+          - alert: HighLatency
+            expr: histogram_quantile(0.99, rate(http_server_request_duration_seconds_bucket{exported_job="service-b"}[5m])) > 2
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Service B p99 latency > 2s"
+              description: "The 99th percentile response time for Service B is above 2 seconds."
+
+          - alert: HighErrorRate
+            expr: rate(http_server_request_duration_seconds_count{http_status_code=~"5.."}[5m]) / rate(http_server_request_duration_seconds_count[5m]) > 0.05
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Error rate above 5%"
+              description: "More than 5% of requests are returning 5xx errors."

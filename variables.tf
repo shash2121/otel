@@ -53,12 +53,6 @@ variable "node_group_max_size" {
   type        = number
 }
 
-variable "deploy_observability" {
-  description = "Deploy observability stack"
-  type        = bool
-  default     = true
-}
-
 variable "tags" {
   description = "Resource tags"
   type        = map(string)
