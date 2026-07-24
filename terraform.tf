@@ -17,6 +17,10 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
   backend "s3" {
     bucket  = "tf-code-311902596413-ap-south-1-an"

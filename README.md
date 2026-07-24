@@ -11,7 +11,10 @@ observability stack.
 | VPC | 2-AZ network with public/private subnets, NAT, IGW |
 | EKS Cluster | Kubernetes 1.31 + managed node group (t3.medium) |
 | EBS CSI Driver | EKS addon — provisions gp2 volumes for PVCs |
-| IAM Roles | Cluster + node group roles and policy attachments |
+| RDS PostgreSQL | db.t3.micro, 20GB, private subnets |
+| Secrets Manager | Stores DB credentials (auto-generated password) |
+| Pod Identity | Maps `otel-demo-sa` → IAM role for RDS + Secrets access |
+| IAM Roles | Cluster, node group, EBS CSI, and pod identity roles |
 
 Everything else — OpenTelemetry Collector, Jaeger, Loki, Prometheus,
 Alertmanager, Grafana, and the sample app — is deployed manually via Helm and
@@ -208,8 +211,12 @@ otel/
 │   ├── docker-compose.yaml
 │   ├── collector-config.yaml
 │   └── build-and-push.sh
-├── k8s/                    # Deployment manifests for the sample app
-├── k6-load.js              # Load-test script
-├── README.md               # This file
-└── blog.md                 # Full manual setup guide
+├── k8s/                      # Deployment manifests + storage class fix
+│   ├── 00-storageclass.yaml
+│   ├── 01-service-a.yaml
+│   ├── 02-service-b.yaml
+│   └── kustomization.yaml
+├── k6-load.js                # Load-test script
+├── README.md                 # This file
+└── blog.md                   # Full manual setup guide
 ```

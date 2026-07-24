@@ -166,3 +166,76 @@ resource "aws_eks_addon" "ebs_csi_driver" {
 
   tags = merge(var.tags, { Name = "ebs-csi-driver-${var.cluster_name}" })
 }
+
+resource "aws_eks_addon" "pod_identity_agent" {
+  cluster_name = aws_eks_cluster.cluster.name
+  addon_name   = "eks-pod-identity-agent"
+
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "PRESERVE"
+
+  depends_on = [aws_eks_node_group.node_group]
+
+  tags = merge(var.tags, { Name = "pod-identity-agent-${var.cluster_name}" })
+}
+
+resource "aws_iam_policy" "rds_access" {
+  count = var.db_secret_name != "" ? 1 : 0
+  name  = "${var.cluster_name}-rds-access-policy"
+  description = "Allows reading DB secret from Secrets Manager and describing RDS"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+        ]
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.db_secret_name}*"
+      },
+      {
+        Effect = "Allow"
+        Action = ["rds:DescribeDBInstances"]
+        Resource = "arn:aws:rds:${var.aws_region}:${data.aws_caller_identity.current.account_id}:db:${var.db_identifier}"
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Name = "${var.cluster_name}-rds-access-policy" })
+}
+
+resource "aws_iam_role" "rds_access" {
+  count = var.db_secret_name != "" ? 1 : 0
+  name  = "${var.cluster_name}-rds-access-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = { Service = "pods.eks.amazonaws.com" }
+      Action = ["sts:AssumeRole", "sts:TagSession"]
+    }]
+  })
+
+  tags = merge(var.tags, { Name = "${var.cluster_name}-rds-access-role" })
+}
+
+resource "aws_iam_role_policy_attachment" "rds_access" {
+  count      = var.db_secret_name != "" ? 1 : 0
+  role       = aws_iam_role.rds_access[0].name
+  policy_arn = aws_iam_policy.rds_access[0].arn
+}
+
+resource "aws_eks_pod_identity_association" "rds_access" {
+  count           = var.db_secret_name != "" ? 1 : 0
+  cluster_name    = aws_eks_cluster.cluster.name
+  namespace       = "default"
+  service_account = var.pod_identity_sa_name
+  role_arn        = aws_iam_role.rds_access[0].arn
+
+  depends_on = [aws_eks_addon.pod_identity_agent]
+
+  tags = merge(var.tags, { Name = "rds-access-pia-${var.cluster_name}" })
+}

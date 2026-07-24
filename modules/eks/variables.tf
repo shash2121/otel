@@ -60,3 +60,21 @@ variable "aws_region" {
   description = "AWS region"
   type        = string
 }
+
+variable "db_secret_name" {
+  description = "Secrets Manager secret name for RDS credentials"
+  type        = string
+  default     = ""
+}
+
+variable "db_identifier" {
+  description = "RDS instance identifier for IAM policy"
+  type        = string
+  default     = ""
+}
+
+variable "pod_identity_sa_name" {
+  description = "Service account name for pod identity association"
+  type        = string
+  default     = "otel-demo-sa"
+}

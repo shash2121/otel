@@ -31,3 +31,4 @@ gateway:
 persistence:
   enabled: true
   size: 10Gi
+  storageClass: gp2

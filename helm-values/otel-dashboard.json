@@ -1,0 +1,245 @@
+{
+  "title": "OTel Demo - Production Overview",
+  "uid": "otel-demo",
+  "panels": [
+    {
+      "title": "Request Rate — Service A",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{exported_job=\"service-a\"}[1m]))",
+          "legendFormat": "req/s",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [{ "format": "reqps", "label": "req/s", "show": true }, { "format": "short", "show": true }]
+    },
+    {
+      "title": "Request Rate — Service B",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{exported_job=\"service-b\"}[1m]))",
+          "legendFormat": "req/s",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [{ "format": "reqps", "label": "req/s", "show": true }, { "format": "short", "show": true }]
+    },
+    {
+      "title": "Request Rate by Endpoint",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{exported_job=\"service-a\"}[1m])) by (http_route)",
+          "legendFormat": "{{http_route}}",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [{ "format": "reqps", "label": "req/s", "show": true }, { "format": "short", "show": true }]
+    },
+    {
+      "title": "Latency — Service A (p50 · p95 · p99)",
+      "type": "graph",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 8 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "description": "Gap between p50 and p99 = how many requests are tail-latency outliers",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket{exported_job=\"service-a\"}[1m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{exported_job=\"service-a\"}[1m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{exported_job=\"service-a\"}[1m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "yaxes": [{ "format": "s", "decimals": 3, "label": "seconds", "show": true }, { "format": "short", "show": true }]
+    },
+    {
+      "title": "Latency — Service B (p50 · p95 · p99)",
+      "type": "graph",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 8 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "description": "Service B simulates DB latency — expect higher values here",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_seconds_bucket{exported_job=\"service-b\"}[1m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{exported_job=\"service-b\"}[1m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{exported_job=\"service-b\"}[1m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "yaxes": [{ "format": "s", "decimals": 3, "label": "seconds", "show": true }, { "format": "short", "show": true }]
+    },
+    {
+      "title": "Error Rate",
+      "type": "graph",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 17 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{http_status_code=~\"5..\"}[1m])) by (exported_job) / sum(rate(http_server_request_duration_seconds_count[1m])) by (exported_job) * 100",
+          "legendFormat": "{{exported_job}} 5xx %",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{http_status_code=~\"4..\"}[1m])) by (exported_job) / sum(rate(http_server_request_duration_seconds_count[1m])) by (exported_job) * 100",
+          "legendFormat": "{{exported_job}} 4xx %",
+          "refId": "B"
+        }
+      ],
+      "yaxes": [{ "format": "percent", "max": 100, "label": "%", "show": true }, { "format": "short", "show": true }],
+      "thresholds": [
+        { "color": "green", "value": null },
+        { "color": "orange", "value": 2 },
+        { "color": "red", "value": 5 }
+      ]
+    },
+    {
+      "title": "Status Codes by Class",
+      "type": "graph",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 17 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "seriesOverrides": [
+        { "alias": "/Svc-A.*/", "dashes": false },
+        { "alias": "/Svc-B.*/", "dashes": true }
+      ],
+      "description": "Solid = Svc-A, Dashed = Svc-B. Green = 2xx, Orange = 4xx, Red = 5xx",
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{exported_job=\"service-a\", http_status_code=~\"2..\"}[1m]))",
+          "legendFormat": "Svc-A 2xx",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{exported_job=\"service-a\", http_status_code=~\"4..\"}[1m]))",
+          "legendFormat": "Svc-A 4xx",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{exported_job=\"service-a\", http_status_code=~\"5..\"}[1m]))",
+          "legendFormat": "Svc-A 5xx",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{exported_job=\"service-b\", http_status_code=~\"2..\"}[1m]))",
+          "legendFormat": "Svc-B 2xx",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{exported_job=\"service-b\", http_status_code=~\"4..\"}[1m]))",
+          "legendFormat": "Svc-B 4xx",
+          "refId": "E"
+        },
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{exported_job=\"service-b\", http_status_code=~\"5..\"}[1m]))",
+          "legendFormat": "Svc-B 5xx",
+          "refId": "F"
+        }
+      ],
+      "yaxes": [{ "format": "reqps", "label": "req/s", "show": true }, { "format": "short", "show": true }],
+      "aliasColors": {
+        "Svc-A 2xx": "#73BF69",
+        "Svc-B 2xx": "#73BF69",
+        "Svc-A 4xx": "#FF9830",
+        "Svc-B 4xx": "#FF9830",
+        "Svc-A 5xx": "#F2495C",
+        "Svc-B 5xx": "#F2495C"
+      }
+    },
+    {
+      "title": "Slowest Endpoints (p99)",
+      "type": "table",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 17 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, http_route, exported_job))",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "renameByName": { "http_route": "Endpoint", "exported_job": "Service", "Value": "p99 (s)" }
+          }
+        }
+      ]
+    },
+    {
+      "title": "Latency Heatmap",
+      "type": "heatmap",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_bucket[1m])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}",
+          "refId": "A"
+        }
+      ],
+      "yAxis": { "format": "s" }
+    },
+    {
+      "title": "Active Alerts",
+      "type": "table",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "ALERTS{alertstate=\"firing\"}",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true, "alertstate": true }
+          }
+        }
+      ]
+    }
+  ],
+  "time": { "from": "now-15m", "to": "now" },
+  "refresh": "10s"
+}
