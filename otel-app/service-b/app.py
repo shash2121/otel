@@ -1,19 +1,21 @@
-import time
-import random
 import logging
 import os
+import json
+import time
+
+import time
 
 from flask import Flask, jsonify, request, g
-from sqlalchemy import create_engine, text, Table, Column, Integer, String, Float, MetaData
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 import boto3
-import json
 
 from opentelemetry import trace, metrics, _logs
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics.view import View, ExplicitBucketHistogramAggregation
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.resources import Resource
@@ -30,7 +32,15 @@ trace.set_tracer_provider(TracerProvider(resource=resource))
 trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
 
 reader = PeriodicExportingMetricReader(OTLPMetricExporter())
-metrics.set_meter_provider(MeterProvider(resource=resource, metric_readers=[reader]))
+views = [
+    View(
+        instrument_name="http.server.request.duration",
+        aggregation=ExplicitBucketHistogramAggregation(
+            boundaries=[0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]
+        )
+    )
+]
+metrics.set_meter_provider(MeterProvider(resource=resource, metric_readers=[reader], views=views))
 meter = metrics.get_meter(__name__)
 
 _logs.set_logger_provider(LoggerProvider(resource=resource))
@@ -39,34 +49,8 @@ handler = LoggingHandler()
 logging.getLogger().addHandler(handler)
 logging.getLogger().setLevel(logging.INFO)
 
-FlaskInstrumentor().instrument()
+FlaskInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
 
-app = Flask(__name__)
-logger = logging.getLogger("service-b")
-
-http_duration = meter.create_histogram(
-    "http.server.request.duration", unit="s", description="Duration of HTTP requests"
-)
-
-@app.before_request
-def _start_timer():
-    g._start = time.time()
-
-@app.after_request
-def _record_duration(response):
-    if hasattr(g, "_start"):
-        http_duration.record(
-            time.time() - g._start,
-            attributes={
-                "http.method": request.method,
-                "http.route": request.path,
-                "http.status_code": response.status_code,
-                "http.scheme": request.scheme,
-            },
-        )
-    return response
-
-# ==== RDS discovery via Pod Identity ====
 DB_IDENTIFIER = os.environ.get("DB_IDENTIFIER", "otel-demo-db")
 SECRET_NAME   = os.environ.get("SECRET_NAME", "otel-demo-rds-credentials")
 AWS_REGION    = os.environ.get("AWS_REGION", "us-east-1")
@@ -83,8 +67,7 @@ def _get_rds_endpoint():
         inst = rds.describe_db_instances(DBInstanceIdentifier=DB_IDENTIFIER)
         ep = inst["DBInstances"][0]["Endpoint"]
         return ep["Address"], ep["Port"]
-    except Exception as e:
-        logger.warning(f"RDS discovery failed, using env vars: {e}")
+    except Exception:
         return os.environ.get("DB_HOST", "localhost"), int(os.environ.get("DB_PORT", 5432))
 
 DB_HOST, DB_PORT = _get_rds_endpoint()
@@ -93,8 +76,8 @@ DB_NAME = os.environ.get("DB_NAME", "otel_demo")
 
 engine = create_engine(
     f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}",
-    pool_size=10,
-    max_overflow=0,
+    pool_size=5,
+    max_overflow=5,
 )
 SQLAlchemyInstrumentor().instrument(engine=engine)
 
@@ -132,19 +115,45 @@ def _init_db():
                     ('Desk Lamp LED', 24.99, 180)
                 """))
             conn.commit()
-        logger.info("Database initialized")
-    except OperationalError as e:
-        logger.error(f"DB init failed: {e}")
+        logging.getLogger("service-b").info("Database initialized")
+    except OperationalError:
+        pass
+
+_init_db()
+
+app = Flask(__name__)
+logger = logging.getLogger("service-b")
+
+http_duration = meter.create_histogram(
+    "http.server.request.duration",
+    unit="s",
+    description="Duration of HTTP requests"
+)
+
+@app.before_request
+def _start_timer():
+    g._start = time.time()
+
+@app.after_request
+def _record_duration(response):
+    if hasattr(g, "_start"):
+        http_duration.record(
+            time.time() - g._start,
+            attributes={
+                "http.method": request.method,
+                "http.route": request.path,
+                "http.status_code": response.status_code,
+            },
+        )
+    return response
 
 
 @app.route("/products")
 def get_products():
-    delay = random.uniform(0.05, 0.5)
-    time.sleep(delay)
     with engine.connect() as conn:
         rows = conn.execute(text("SELECT id, name, price, stock FROM products ORDER BY id"))
         products = [{"id": r[0], "name": r[1], "price": float(r[2]), "stock": r[3]} for r in rows]
-    logger.info(f"Returning {len(products)} products (took {delay:.3f}s)")
+    logger.info(f"Returning {len(products)} products")
     return jsonify({"products": products, "count": len(products)})
 
 
@@ -156,9 +165,6 @@ def create_order():
 
     if not product_id:
         return jsonify({"error": "product_id is required"}), 400
-
-    delay = random.uniform(0.1, 0.8)
-    time.sleep(delay)
 
     with engine.connect() as conn:
         row = conn.execute(
@@ -187,23 +193,17 @@ def search_products():
     q = request.args.get("q", "")
     if not q:
         return jsonify({"error": "query parameter 'q' is required"}), 400
-    delay = random.uniform(0.05, 0.3)
-    time.sleep(delay)
+    time.sleep(0.5)  # simulates slow ILIKE on unindexed table
     with engine.connect() as conn:
         rows = conn.execute(
             text("SELECT id, name, price, stock FROM products WHERE name ILIKE :q ORDER BY id"),
             {"q": f"%{q}%"}
         )
         products = [{"id": r[0], "name": r[1], "price": float(r[2]), "stock": r[3]} for r in rows]
-    logger.info(f"Search '{q}' returned {len(products)} results (took {delay:.3f}s)")
+    logger.info(f"Search '{q}' returned {len(products)} results")
     return jsonify({"products": products, "count": len(products), "query": q})
 
 
 @app.route("/health")
 def health():
     return jsonify({"status": "healthy"})
-
-
-if __name__ == "__main__":
-    _init_db()
-    app.run(host="0.0.0.0", port=5000)

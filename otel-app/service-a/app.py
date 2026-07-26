@@ -1,7 +1,6 @@
-import time
-import random
 import logging
 import os
+import time
 
 import requests
 from flask import Flask, jsonify, request, g
@@ -11,6 +10,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics.view import View, ExplicitBucketHistogramAggregation
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.resources import Resource
@@ -27,7 +27,15 @@ trace.set_tracer_provider(TracerProvider(resource=resource))
 trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
 
 reader = PeriodicExportingMetricReader(OTLPMetricExporter())
-metrics.set_meter_provider(MeterProvider(resource=resource, metric_readers=[reader]))
+views = [
+    View(
+        instrument_name="http.server.request.duration",
+        aggregation=ExplicitBucketHistogramAggregation(
+            boundaries=[0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]
+        )
+    )
+]
+metrics.set_meter_provider(MeterProvider(resource=resource, metric_readers=[reader], views=views))
 meter = metrics.get_meter(__name__)
 
 _logs.set_logger_provider(LoggerProvider(resource=resource))
@@ -36,13 +44,11 @@ handler = LoggingHandler()
 logging.getLogger().addHandler(handler)
 logging.getLogger().setLevel(logging.INFO)
 
-FlaskInstrumentor().instrument()
-RequestsInstrumentor().instrument()
+FlaskInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
+RequestsInstrumentor().instrument(tracer_provider=trace.get_tracer_provider())
 
 app = Flask(__name__)
-
 logger = logging.getLogger("service-a")
-SERVICE_B_URL = os.environ.get("SERVICE_B_URL", "http://service-b:5000")
 
 http_duration = meter.create_histogram(
     "http.server.request.duration",
@@ -63,10 +69,11 @@ def _record_duration(response):
                 "http.method": request.method,
                 "http.route": request.path,
                 "http.status_code": response.status_code,
-                "http.scheme": request.scheme,
-            }
+            },
         )
     return response
+
+SERVICE_B_URL = os.environ.get("SERVICE_B_URL", "http://service-b:5000")
 
 
 @app.route("/")
@@ -104,11 +111,6 @@ def create_order():
         return jsonify({"error": "service-b unavailable"}), 503
 
 
-@app.route("/health")
-def health():
-    return jsonify({"status": "healthy"})
-
-
 @app.route("/products/search")
 def search_products():
     q = request.args.get("q", "")
@@ -122,5 +124,6 @@ def search_products():
         return jsonify({"error": "service-b unavailable"}), 503
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+@app.route("/health")
+def health():
+    return jsonify({"status": "healthy"})

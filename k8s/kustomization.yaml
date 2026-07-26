@@ -3,6 +3,10 @@ kind: Kustomization
 
 resources:
   - 00-storageclass.yaml
-  - 01-service-a.yaml
-  - 02-service-b.yaml
-  - 03-service-account.yaml
+  - 01-service-account.yaml
+  - 02-service-a.yaml
+  - 03-service-b.yaml
+  - 04-secret-provider.yaml
+  - 05-sync-secret-job.yaml
+  - 08-ingress.yaml
+  - 09-grafana-dashboards.yaml

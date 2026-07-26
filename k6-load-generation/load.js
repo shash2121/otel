@@ -8,34 +8,40 @@ export const options = {
     // ---- Scenario 1: Baseline browsing traffic (runs entire test) ----
     browsing: {
       executor: "constant-arrival-rate",
-      exec: "browsing",  // controls req/s, not concurrent users
-      rate: 3,                             // 3 requests per second
-      timeUnit: "1s",                      // the unit for 'rate'
-      duration: "4m",                      // this scenario runs for 4 minutes
-      preAllocatedVUs: 5,                  // start with 5 virtual users pre-warmed
-      maxVUs: 20,                          // don't scale beyond 20 VUs
+      exec: "browsing",
+      rate: 3,
+      timeUnit: "1s",
+      duration: "10m",                     // runs entire test — 10 minutes
+      preAllocatedVUs: 5,
+      maxVUs: 20,
     },
 
-    // ---- Scenario 2: Traffic surge (starts 1 minute in, runs once) ----
+    // ---- Scenario 2: Traffic surge (starts 1 minute in, repeats) ----
     surge: {
       executor: "ramping-arrival-rate",
-      exec: "surge",    // variable req/s over stages
-      startRate: 0,                        // start from 0 req/s
+      exec: "surge",
+      startRate: 0,
       timeUnit: "1s",
       preAllocatedVUs: 5,
       maxVUs: 30,
-      startTime: "1m",                     // wait 1 minute before this scenario begins
-      gracefulStop: "10s",                  // let in-flight requests finish for 10s
+      startTime: "1m",
+      gracefulStop: "10s",
       stages: [
-        { target: 0, duration: "0s" },    // baseline: 0 req/s
-        { target: 15, duration: "20s" },  // spike up to 15 req/s over 20 seconds
-        { target: 15, duration: "30s" },  // hold at 15 req/s for 30 seconds
-        { target: 1, duration: "10s" },   // drop back to 1 req/s
-        { target: 0, duration: "0s" },    // stop
+        { target: 0, duration: "0s" },
+        { target: 15, duration: "20s" },   // spike up
+        { target: 15, duration: "1m" },    // hold peak for 1 minute (was 30s)
+        { target: 1, duration: "10s" },    // drop off
+        { target: 0, duration: "0s" },
+        // Second surge at 5 minute mark
+        { target: 0, duration: "3m" },     // wait
+        { target: 15, duration: "20s" },   // spike again
+        { target: 15, duration: "1m" },    // hold
+        { target: 1, duration: "10s" },
+        { target: 0, duration: "0s" },
       ],
     },
 
-    // ---- Scenario 3: Periodic bursts (runs repeatedly) ----
+    // ---- Scenario 3: Periodic bursts ---
     burst: {
       executor: "ramping-arrival-rate",
       exec: "burst",
@@ -46,24 +52,30 @@ export const options = {
       startTime: "30s",
       gracefulStop: "10s",
       stages: [
-        // Pattern repeats 3 times: 40s quiet → 5s spike → 5s cooldown
-        { target: 0, duration: "40s" },   // quiet period
-        { target: 25, duration: "5s" },   // sharp spike to 25 req/s
-        { target: 2, duration: "5s" },    // brief cooldown
-        { target: 0, duration: "40s" },   // quiet
-        { target: 25, duration: "5s" },   // spike
-        { target: 2, duration: "5s" },    // cooldown
-        { target: 0, duration: "40s" },   // quiet
-        { target: 25, duration: "5s" },   // spike
-        { target: 0, duration: "10s" },   // end
+        // 5 bursts, 40s apart
+        { target: 0, duration: "40s" },
+        { target: 25, duration: "5s" },
+        { target: 2, duration: "5s" },
+        { target: 0, duration: "40s" },
+        { target: 25, duration: "5s" },
+        { target: 2, duration: "5s" },
+        { target: 0, duration: "40s" },
+        { target: 25, duration: "5s" },
+        { target: 2, duration: "5s" },
+        { target: 0, duration: "40s" },
+        { target: 25, duration: "5s" },
+        { target: 2, duration: "5s" },
+        { target: 0, duration: "40s" },
+        { target: 25, duration: "5s" },
+        { target: 0, duration: "10s" },
       ],
     },
   },
 
   // ---- Pass/fail thresholds ----
   thresholds: {
-    http_req_duration: ["p(95)<2000", "p(99)<3000"], // 95% of requests must complete under 2s
-    http_req_failed: ["rate<0.10"],                   // failure rate must stay below 10%
+    http_req_duration: ["p(95)<500", "p(99)<1000"],
+    http_req_failed: ["rate<0.10"],
   },
 };
 

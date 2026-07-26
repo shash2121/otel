@@ -1,0 +1,223 @@
+{
+  "title": "OTel Demo — PostgreSQL / RDS",
+  "uid": "otel-rds",
+  "panels": [
+    {
+      "title": "Throughput — QPS + Transactions",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "targets": [
+        {
+          "expr": "rate(pg_stat_database_tup_fetched{datname=\"otel_demo\"}[1m])",
+          "legendFormat": "SELECT",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(pg_stat_database_tup_inserted{datname=\"otel_demo\"}[1m])",
+          "legendFormat": "INSERT",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(pg_stat_database_tup_updated{datname=\"otel_demo\"}[1m])",
+          "legendFormat": "UPDATE",
+          "refId": "C"
+        },
+        {
+          "expr": "rate(pg_stat_database_tup_deleted{datname=\"otel_demo\"}[1m])",
+          "legendFormat": "DELETE",
+          "refId": "D"
+        },
+        {
+          "expr": "rate(pg_stat_database_xact_commit{datname=\"otel_demo\"}[1m])",
+          "legendFormat": "COMMIT",
+          "refId": "E"
+        },
+        {
+          "expr": "rate(pg_stat_database_xact_rollback{datname=\"otel_demo\"}[1m])",
+          "legendFormat": "ROLLBACK",
+          "refId": "F"
+        }
+      ],
+      "yaxes": [{ "format": "short", "label": "ops/s", "show": true }, { "format": "short", "show": true }],
+      "aliasColors": {
+        "SELECT": "#5794F2",
+        "INSERT": "#73BF69",
+        "UPDATE": "#FF9830",
+        "DELETE": "#F2495C",
+        "COMMIT": "#8F3BB8",
+        "ROLLBACK": "#E02F44"
+      }
+    },
+    {
+      "title": "Active Connections",
+      "type": "graph",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "targets": [
+        {
+          "expr": "sum(pg_stat_database_numbackends{datname=\"otel_demo\"})",
+          "legendFormat": "connections",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [{ "format": "short", "label": "conns", "show": true }, { "format": "short", "show": true }],
+      "thresholds": [
+        { "color": "green", "value": null },
+        { "color": "orange", "value": 8 },
+        { "color": "red", "value": 10 }
+      ]
+    },
+    {
+      "title": "Cache Hit Ratio",
+      "type": "graph",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 8 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "targets": [
+        {
+          "expr": "sum(pg_stat_database_blks_hit{datname=\"otel_demo\"}) / (sum(pg_stat_database_blks_hit{datname=\"otel_demo\"}) + sum(pg_stat_database_blks_read{datname=\"otel_demo\"})) * 100",
+          "legendFormat": "cache hit %",
+          "refId": "A"
+        }
+      ],
+      "yaxes": [{ "format": "percent", "max": 100, "label": "%", "show": true }, { "format": "short", "show": true }],
+      "thresholds": [
+        { "color": "red", "value": null },
+        { "color": "orange", "value": 95 },
+        { "color": "green", "value": 99 }
+      ]
+    },
+    {
+      "title": "Scans — Sequential vs Index",
+      "type": "graph",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "targets": [
+        {
+          "expr": "sum(rate(pg_stat_user_tables_seq_scan{schemaname=\"public\"}[1m]))",
+          "legendFormat": "seq scan",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(pg_stat_user_tables_idx_scan{schemaname=\"public\"}[1m]))",
+          "legendFormat": "index scan",
+          "refId": "B"
+        }
+      ],
+      "yaxes": [{ "format": "short", "label": "scans/s", "show": true }, { "format": "short", "show": true }],
+      "aliasColors": {
+        "seq scan": "#F2495C",
+        "index scan": "#73BF69"
+      }
+    },
+    {
+      "title": "Rows Fetched vs Returned",
+      "type": "graph",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 15 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "targets": [
+        {
+          "expr": "rate(pg_stat_database_tup_fetched{datname=\"otel_demo\"}[1m])",
+          "legendFormat": "fetched (from disk)",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(pg_stat_database_tup_returned{datname=\"otel_demo\"}[1m])",
+          "legendFormat": "returned (to client)",
+          "refId": "B"
+        }
+      ],
+      "yaxes": [{ "format": "short", "label": "rows/s", "show": true }, { "format": "short", "show": true }],
+      "description": "Large gap = inefficient queries reading more rows than needed"
+    },
+    {
+      "title": "Connection States",
+      "type": "graph",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 15 },
+      "lines": true,
+      "linewidth": 2,
+      "pointradius": 0,
+      "targets": [
+        {
+          "expr": "sum(pg_stat_activity_count{datname=\"otel_demo\",state=\"active\"})",
+          "legendFormat": "active",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(pg_stat_activity_count{datname=\"otel_demo\",state=\"idle\"})",
+          "legendFormat": "idle",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(pg_stat_activity_count{datname=\"otel_demo\",state=\"idle in transaction\"})",
+          "legendFormat": "idle in tx",
+          "refId": "C"
+        }
+      ],
+      "yaxes": [{ "format": "short", "label": "conns", "show": true }, { "format": "short", "show": true }],
+      "description": "idle in transaction > 0 = connection leak",
+      "aliasColors": {
+        "active": "#73BF69",
+        "idle": "#5794F2",
+        "idle in tx": "#F2495C"
+      }
+    },
+    {
+      "title": "Locks (exclusive)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 22 },
+      "targets": [
+        {
+          "expr": "sum(pg_locks_count{mode=\"exclusive\"})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Deadlocks",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 22 },
+      "targets": [
+        {
+          "expr": "sum(rate(pg_stat_database_deadlocks{datname=\"otel_demo\"}[5m]) * 300)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "time": { "from": "now-15m", "to": "now" },
+  "refresh": "10s"
+}

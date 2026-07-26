@@ -9,10 +9,4 @@ COPY app.py .
 
 EXPOSE 5000
 
-ENV OTEL_SERVICE_NAME=service-b
-ENV OTEL_TRACES_EXPORTER=otlp
-ENV OTEL_METRICS_EXPORTER=otlp
-ENV OTEL_LOGS_EXPORTER=otlp
-ENV OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-
-CMD ["python", "app.py"]
+CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "app:app"]

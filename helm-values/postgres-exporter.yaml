@@ -1,0 +1,45 @@
+config:
+  datasource:
+    host: ""
+    user: ""
+    password: "x"
+    database: ""
+
+command:
+  - sh
+  - -c
+  - |
+    export DATA_SOURCE_NAME="postgresql://$(cat /mnt/secrets/DB_USERNAME):$(cat /mnt/secrets/DB_PASSWORD)@$(cat /mnt/secrets/DB_HOST):5432/otel_demo?sslmode=require"
+    exec /bin/postgres_exporter
+
+extraVolumes:
+  - name: secrets
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: rds-exporter-secrets
+
+extraVolumeMounts:
+  - name: secrets
+    mountPath: /mnt/secrets
+    readOnly: true
+
+serviceAccount:
+  create: false
+  name: otel-demo-sa
+
+service:
+  port: 9187
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9187"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
