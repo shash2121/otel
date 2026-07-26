@@ -32,6 +32,5 @@ otel/
 │   ├── service-a/           # API gateway
 │   └── service-b/           # Backend + DB access
 ├── k6-load-generation/      # Load-test scripts
-├── README.md                # This file
-└── blog.md                  # Full setup guide
+└── README.md                # This file
 ```
